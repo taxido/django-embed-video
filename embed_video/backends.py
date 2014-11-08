@@ -215,13 +215,13 @@ class VideoBackend(object):
         url += '?' + self.query.urlencode() if self.query else ''
         return mark_safe(url)
 
-    def get_thumbnail_url(self):
+    def get_thumbnail_url(self, pattern=None):
         """
         Returns thumbnail URL folded from :py:data:`pattern_thumbnail_url` and
         parsed code.
         """
-        return self.pattern_thumbnail_url.format(code=self.code,
-                                                 protocol=self.protocol)
+        pattern = pattern or self.pattern_thumbnail_url
+        return pattern.format(code=self.code, protocol=self.protocol)
 
     def get_embed_code(self, width, height):
         """
@@ -265,6 +265,7 @@ class YoutubeBackend(VideoBackend):
 
     pattern_url = '{protocol}://www.youtube.com/embed/{code}'
     pattern_thumbnail_url = '{protocol}://img.youtube.com/vi/{code}/maxresdefault.jpg'
+    pattern_thumbnail_url_fallback = '{protocol}://img.youtube.com/vi/{code}/hqdefault.jpg'
     default_query = EMBED_VIDEO_YOUTUBE_DEFAULT_QUERY
 
     def get_code(self):
@@ -282,6 +283,16 @@ class YoutubeBackend(VideoBackend):
                 raise UnknownIdException('Cannot get ID from `{0}`'.format(self._url))
 
         return code
+
+    def get_thumbnail_url(self):
+        url = super(YoutubeBackend, self) \
+            .get_thumbnail_url(pattern=self.pattern_thumbnail_url)
+
+        if requests.get(url).status_code != requests.codes.ok:
+            url = super(YoutubeBackend, self) \
+                .get_thumbnail_url(pattern=self.pattern_thumbnail_url_fallback)
+        return url
+
 
 
 class VimeoBackend(VideoBackend):
