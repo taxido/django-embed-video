@@ -327,6 +327,9 @@ class VimeoBackend(VideoBackend):
     """
     Backend for Vimeo URLs.
     """
+    _info = None
+    base_url = 'http://vimeo.com/api/oembed.json'
+
     re_detect = re.compile(
         r'^((http(s)?:)?//)?(www\.)?(player\.)?vimeo\.com/.*', re.I
     )
@@ -335,14 +338,29 @@ class VimeoBackend(VideoBackend):
     pattern_info = '{protocol}://vimeo.com/api/v2/video/{code}.json'
 
     def get_info(self):
-        try:
-            response = requests.get(
-                self.pattern_info.format(code=self.code, protocol=self.protocol),
-                timeout=EMBED_VIDEO_TIMEOUT
+        if self._info:
+            return self._info
+
+        params = {
+            'url': self._url,
+        }
+        r = requests.get(self.base_url, params=params,
+                         timeout=EMBED_VIDEO_TIMEOUT)
+
+        if r.status_code != 200:
+            raise VideoDoesntExistException(
+                'Vimeo returned status code `{0}`.'.format(r.status_code)
             )
-            return json.loads(response.text)[0]
-        except ValueError:
-            raise VideoDoesntExistException()
+        self._info=r.json()
+        return self._info
+
+    def get_code(self):
+        """
+        Returns video code matched from given url by :py:data:`re_code`.
+
+        :rtype: str
+        """
+        return self.info.get('video_id')
 
     def get_thumbnail_url(self):
         return self.info.get('thumbnail_large')
@@ -352,7 +370,7 @@ class SoundCloudBackend(VideoBackend):
     """
     Backend for SoundCloud URLs.
     """
-    base_url = 'http://soundcloud.com/oembed'
+    base_url = 'http://soundcloud.com/oembed.json'
 
     re_detect = re.compile(r'^(http(s)?://(www\.)?)?soundcloud\.com/.*', re.I)
     re_code = re.compile(r'src=".*%2F(?P<code>\d+)&show_artwork.*"', re.I)
